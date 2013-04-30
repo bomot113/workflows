@@ -2,12 +2,13 @@
 /*
  * filename: cmd_dispatch.php 
  */
- 
+include_once 'string_util.php'; 
 include_once 'cmd_VARS.php';
-include 'db_util.php';
-include 'cmd_util.php';
-include 'cmd_workflow.php';
-
+include_once 'db_util.php';
+include_once 'cmd_util.php';
+include_once 'cmd_workflow.php';
+include_once 'cmd_node.php';
+include_once 'cmd_link.php';
 /*
  * This function seeks to find a function that matches the command
  */
@@ -21,13 +22,22 @@ function dispatchCommand($cmd_list)
 	if ($status != cCmdStatus_NOT_FOUND) {
 		return $status; 
 	}
-	
 		// Try to match the command against the utility commands
 	$status = dispatchWorkflowCmd($cmd, $cmd_list); 
 	if ($status != cCmdStatus_NOT_FOUND) {
 		return $status; 
 	}
-		
+		// Try to match the command against the Node commands
+	$status = dispatchNodeCmd($cmd, $cmd_list);
+	if ($status != cCmdStatus_NOT_FOUND) {
+		return $status;
+	}
+		// Try to match the command against the Link commands
+	$status = dispatchLinkCmd($cmd, $cmd_list);
+	if ($status != cCmdStatus_NOT_FOUND) {
+		return $status;
+	}
+	
 	// You could sent the command to other dispatchers if desired ... 
 	// $status = dispatchXxxxCmd($cmd, $cmd_list); 
 
@@ -223,7 +233,6 @@ function parseCommandLine($cmd_in)
 		
 		//echo "Echo: " . $cmd . "\n";
 	}
-	
 	$gLastCommand = $cmd_in; 
 	return $cmd_list;
 }

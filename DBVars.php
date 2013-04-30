@@ -13,19 +13,20 @@
  *     (1) dante.u.washington.edu for students     (vergil) 
  *     (2) homer.u.washington.edu for faculty/staff or shared accounts  (ovid)
  */
-$gDB_host	= "localhost";
+$gDB_host	= "vergil.u.washington.edu";
+
 /*
  * The name of the database
  */
-$gDB_name	= 'info445';
+$gDB_name	= 'postgres';
 /*
  * The port on which the database is listening  
  */
-$gDB_port		= '4532';
+$gDB_port		= '45984';
 /*
  * The NetID user name 
  */
-$gDB_user	= 'tuebui';
+$gDB_user	= 'webuser';
 
 $gDB_password = '123456';
 /*

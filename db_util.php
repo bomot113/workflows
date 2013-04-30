@@ -2,7 +2,6 @@
 /*
  * filename: db_util.php 
  */
-
 // include key database variables for connection string 
 include 'DBVars.php';
 	
@@ -37,7 +36,35 @@ include 'DBVars.php';
 		//echo "DEBUG: " . $sql;
 		return $return_value;
 	}
-
+/*
+ * Runs a db query that returns a single scalar value only 
+ */
+	function runTableDbQuery($sql) 
+	{
+		global $gDB_conn_string;
+	
+		$return_value = 0; 
+		
+		// Try to make a connection 
+		$db = pg_connect($gDB_conn_string); 
+		if (!$db) {
+			die("Error in connection: " . pg_last_error());
+		}     
+		
+		// Create and run a query 
+		$result = pg_query($db, $sql);
+		if (!$result) {
+			die("Error in SQL query: " . pg_last_error());
+		}
+		else {
+			$row = pg_fetch_array($result); 
+			$return_value = $row;
+		}
+		pg_free_result($result);       
+		pg_close($db);
+		//echo "DEBUG: " . $sql;
+		return $return_value;
+	}
 /* 
  * This is a call back function for printing the rows of a result set. This 
  * function, or other function with this signature, can be passed into the 

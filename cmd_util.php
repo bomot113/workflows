@@ -3,7 +3,6 @@
  * filename: cmd_util.php 
  */
 
-
 /*
  * This function dispatches a command and its parameters to the corresponding function 
  */
@@ -37,13 +36,12 @@ function dispatchUtilCmd($cmd, $cmd_list)
 	}
 	elseif ($cmd == "print") {
 		$status = print_cmd($cmd_list);
-	} else if ($cmd == "workflow") {
-
 	} else {
 		$status = cCmdStatus_NOT_FOUND; 
 	}
 	return $status;
 }
+
 
 /*
  * hello -- Prints a message to the terminal 
