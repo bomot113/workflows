@@ -14,13 +14,12 @@ BEGIN
 
 	-- Link 2 nodes together
 	IF ($4 = 'S') THEN
-		INSERT INTO indv.link (startNode_id, endNode_id, label) values (local_id, $2, $3);
+		PERFORM indv.link_nodes(local_id, $2, $3);
 	ELSEIF ($4 = 'E') THEN
-		INSERT INTO indv.link (startNode_id, endNode_id, label) values ($2, local_id, $3);
+		PERFORM indv.link_nodes($2, local_id, $3);
 	ELSE
 		-- DO NOTHING HERE
 	END IF;
-	SELECT currval('indv.link_link_id_seq') INTO local_id;
-	RETURN local_link_id;
+	RETURN 1;
 END;
 $$ LANGUAGE plpgsql;

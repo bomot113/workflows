@@ -19,11 +19,12 @@ class Link_Controller {
 			} else {
 				if ($position == 'start') {
 					$this->wf->link_WF($this->node->get_n_id(), $label,'S');
+				  $result = "the start node has been linked to the node '$n_sn'";
 				}
 				elseif ($position == 'finish') {
 					$this->wf->link_WF($this->node->get_n_id(), $label,'E');
+				  $result = "the node '$n_sn' has been linked  the end node";
 				}
-				$result = "the node '$n_sn' has been linked to the start node";
 			}
 		}
 		return $result;
@@ -55,7 +56,7 @@ class Link_Controller {
 
 		// linking nodes together
 		$this->wf->link_nodes($n_id_from, $n_id_to, $label);
-		$result = "the node '$n_id_from' has been linked to the node $n_id_to";
+		$result = "the node '$n_name_from' has been linked to the node '$n_name_to'";
 		return $result;
 	}
 }

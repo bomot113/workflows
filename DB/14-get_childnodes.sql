@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION indv.get_childnodes(integer) 
+﻿CREATE OR REPLACE FUNCTION indv.get_childnodes(integer) 
 	RETURNS TABLE (childnode_n_sn varchar(255), from_n_sn varchar(255), linkinfo text) 
 AS $$ 
 BEGIN
