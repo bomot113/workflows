@@ -11,6 +11,7 @@ create table final.workflow(
 	description text,
 	start_status_id int not null,
 	final_status_id int not null,
+	primary key (wf_id),
 	foreign key (start_status_id) references final.status(status_id) on delete no action,
 	foreign key (final_status_id) references final.status(status_id) on delete no action
 )
@@ -243,3 +244,202 @@ BEGIN
 END
 $$ LANGUAGE plpgsql;
 -- select * from final.get_Status_by_workflow('normal workflow');
+
+create table final.project(
+	prj_id serial not null,
+	prj_name varchar(255) UNIQUE,
+	description text,
+	wf_id int not null,
+	primary key (prj_id),
+	foreign key (wf_id) references final.workflow(wf_id) on delete no action
+)
+
+CREATE OR REPLACE FUNCTION final.create_project(integer, varchar(255), text) 
+	RETURNS INTEGER 
+AS $$ 
+DECLARE
+	local_prj_id integer;
+BEGIN
+	INSERT INTO final.project (wf_id, prj_name, description) 
+	VALUES ($1, $2, $3);
+	SELECT currval('final.project_prj_id_seq') INTO local_prj_id;		
+	-- Return prj_id to the application
+	RETURN local_prj_id;
+END;
+$$ LANGUAGE plpgsql;
+-- select final.create_project(2, 'INFO445 final project','an awesome class')
+
+CREATE OR REPLACE FUNCTION final.get_projects() 
+	RETURNS TABLE (prj_name varchar(255), description text) 
+AS $$ 
+BEGIN
+	RETURN QUERY
+	SELECT prj.prj_name, prj.description 
+	FROM final.project prj;
+END;
+$$ LANGUAGE plpgsql;
+-- select * from final.get_projects()
+
+CREATE OR REPLACE FUNCTION final.delete_project(varchar(255)) 
+	RETURNS VOID 
+AS $$ 
+DECLARE
+	local_prj_id integer;
+BEGIN
+	DELETE
+	FROM final.project
+	WHERE prj_name=$1;		
+	-- Return prj_id to the application
+END;
+$$ LANGUAGE plpgsql;
+-- select final.delete_project(2)
+
+create table final.user(
+	usr_id serial not null,
+	usr_name varchar(255) UNIQUE,
+	primary key (usr_id)
+)
+
+CREATE OR REPLACE FUNCTION final.create_user(varchar(255)) 
+	RETURNS INTEGER 
+AS $$ 
+DECLARE
+	local_usr_id integer;
+BEGIN
+	INSERT INTO final.user (usr_name) 
+	VALUES ($1);
+	SELECT currval('final.user_usr_id_seq') INTO local_usr_id;		
+	-- Return prj_id to the application
+	RETURN local_usr_id;
+END;
+$$ LANGUAGE plpgsql;
+-- select * from final.create_user('tue')
+
+CREATE OR REPLACE FUNCTION final.delete_user(varchar(255)) 
+	RETURNS VOID 
+AS $$ 
+BEGIN
+	DELETE
+	FROM final.user
+	WHERE usr_name=$1;		
+	-- Return prj_id to the application
+END;
+$$ LANGUAGE plpgsql;
+-- select final.delete_user('tue')
+
+CREATE OR REPLACE FUNCTION final.get_users() 
+	RETURNS TABLE (usr_id integer, usr_name varchar(255)) 
+AS $$ 
+BEGIN
+	RETURN QUERY
+	SELECT usr.usr_id, usr.usr_name 
+	FROM final.user usr;
+END;
+$$ LANGUAGE plpgsql;
+-- select * from final.get_users()
+
+create table final.Project_User_Role (
+	usr_id integer not null,
+	prj_id integer not null,
+	primary key (usr_id, prj_id),
+	foreign key (usr_id) references final.user(usr_id) on delete no action,
+	foreign key (prj_id) references final.project(prj_id) on delete no action
+)
+
+CREATE OR REPLACE FUNCTION final.assign_user_project(varchar(255), varchar(255)) 
+	RETURNS INTEGER 
+AS $$ 
+DECLARE
+	local_usr_id integer;
+	local_prj_id integer;
+
+BEGIN
+	
+	SELECT prj_usr.usr_id into local_usr_id
+	FROM final.Project_User_Role prj_usr
+		INNER JOIN final.user usr
+			ON prj_usr.usr_id = usr.usr_id
+		INNER JOIN final.project prj
+			ON prj_usr.prj_id = prj.prj_id
+	WHERE usr.usr_name = $1 AND prj.prj_name = $2;
+
+	IF (local_usr_id is NULL) THEN
+
+		SELECT usr.usr_id into local_usr_id
+		FROM final.user usr
+		WHERE usr.usr_name = $1;
+
+		SELECT prj.prj_id into local_prj_id
+		FROM final.project prj
+		WHERE prj.prj_name = $2;
+
+		INSERT INTO final.Project_User_Role (usr_id, prj_id)
+		VALUES (local_usr_id, local_prj_id);
+		RETURN 1;
+	END IF;
+	-- Return failed to the application
+	RETURN 0;
+END;
+$$ LANGUAGE plpgsql;
+-- select * from final.assign_user_project('tue', 'INFO445 final project')
+
+CREATE OR REPLACE FUNCTION final.get_all_user_in_project(varchar(255)) 
+	RETURNS TABLE (usr_name varchar(255), usr_id integer) 
+AS $$ 
+BEGIN
+	RETURN QUERY
+	SELECT usr.usr_name, usr.usr_id
+	FROM final.Project_User_Role prj_usr
+		INNER JOIN final.user usr
+			ON prj_usr.usr_id = usr.usr_id
+		INNER JOIN final.project prj
+			ON prj_usr.prj_id = prj.prj_id
+	WHERE prj.prj_name = $1;
+	
+END;
+$$ LANGUAGE plpgsql;
+-- 	SELECT * from final.get_all_user_in_project('INFO445 final project');
+
+create table final.Bug (
+	bug_id serial not null,
+	prj_id integer not null,
+	status_id integer not null,
+	bug_title varchar(255),
+	date_created timestamp not null,
+	content text,
+	primary key (bug_id),
+	foreign key (prj_id) references final.project(prj_id) on delete no action,
+	foreign key (status_id) references final.status(status_id) on delete no action
+)
+
+CREATE OR REPLACE FUNCTION final.create_bug(varchar(255), varchar(255), text) 
+	RETURNS INTEGER 
+AS $$ 
+DECLARE
+	local_prj_id integer;
+	local_status_id integer;
+
+BEGIN
+	-- get the prj_id and status_id first
+	SELECT 	prj.prj_id into local_prj_id,
+			link.endstatus_id into local_status_id
+	FROM final.project prj
+		INNER JOIN final.workflow wf
+			ON prj.wf_id = wf.wf_id
+		INNER JOIN final.link link
+			ON wf.start_status_id = link.startstatus_id
+
+	WHERE prj.prj_name = $1;
+
+	-- get the initial status
+
+	IF (local_status_id is not null) THEN
+		INSERT INTO final.Bug (prj_id, status_id, date_created, bug_title, content)
+		VALUES (local_prj_id, local_status_id, now(), $2, $3);
+		RETURN 1;
+	END IF
+	-- Return success to the application
+	RETURN 0;
+END;
+$$ LANGUAGE plpgsql;
+-- select * from final.create_bug('INFO445 final project', 'cannot log in')
