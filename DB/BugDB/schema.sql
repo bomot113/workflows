@@ -421,8 +421,8 @@ DECLARE
 
 BEGIN
 	-- get the prj_id and status_id first
-	SELECT 	prj.prj_id into local_prj_id,
-			link.endstatus_id into local_status_id
+	SELECT 	prj.prj_id,link.endstatus_id
+			into local_prj_id, local_status_id
 	FROM final.project prj
 		INNER JOIN final.workflow wf
 			ON prj.wf_id = wf.wf_id
@@ -437,9 +437,164 @@ BEGIN
 		INSERT INTO final.Bug (prj_id, status_id, date_created, bug_title, content)
 		VALUES (local_prj_id, local_status_id, now(), $2, $3);
 		RETURN 1;
-	END IF
+	END IF;
 	-- Return success to the application
 	RETURN 0;
 END;
 $$ LANGUAGE plpgsql;
--- select * from final.create_bug('INFO445 final project', 'cannot log in')
+-- select * from final.create_bug('INFO445 final project','cannot log in','It keeps raising ERRORS')
+
+CREATE OR REPLACE FUNCTION final.delete_bug(varchar(255), varchar(255)) 
+	RETURNS INTEGER 
+AS $$ 
+DECLARE
+	local_bug_id integer;
+
+BEGIN
+	-- get the bug_id first
+	SELECT 	bug.bug_id into local_bug_id
+	FROM final.project prj
+		INNER JOIN final.bug bug
+			ON prj.prj_id = bug.prj_id
+	WHERE prj.prj_name = $1 AND bug.bug_title=$2;
+
+	DELETE 
+	FROM final.bug bug
+	WHERE bug.bug_id = local_bug_id;
+	-- Return success to the application
+	RETURN 1;
+END;
+$$ LANGUAGE plpgsql;
+-- select * from final.delete_bug('INFO445 final project','cannot log in')
+
+CREATE OR REPLACE FUNCTION final.delete_bug(integer) 
+	RETURNS INTEGER 
+AS $$ 
+
+BEGIN
+	DELETE 
+	FROM final.bug bug
+	WHERE bug.bug_id = $1;
+	-- Return success to the application
+	RETURN 1;
+END;
+$$ LANGUAGE plpgsql;
+-- select * from final.delete_bug(1)
+
+CREATE OR REPLACE FUNCTION final.get_all_bugs_in_project(varchar(255)) 
+	RETURNS TABLE (bug_id integer, bug_title varchar(255), status varchar(255), content text) 
+AS $$ 
+BEGIN
+	RETURN QUERY
+	SELECT bug.bug_id, bug.bug_title, status.status_name, bug.content
+	FROM final.bug bug
+		INNER JOIN final.project prj
+			ON prj.prj_id = bug.prj_id
+		INNER JOIN final.status status
+			ON bug.status_id = status.status_id
+	WHERE prj.prj_name = $1;
+	
+END;
+$$ LANGUAGE plpgsql;
+-- 	SELECT * from final.get_all_bugs_in_project('INFO445 final project');
+
+create table final.users_bug_rel (
+	usr_id integer not null,
+	bug_id integer not null,
+	role varchar(255),
+	primary key (usr_id, bug_id),
+	foreign key (usr_id) references final.user(usr_id) on delete cascade,
+	foreign key (bug_id) references final.bug(bug_id) on delete cascade
+)
+
+
+CREATE OR REPLACE FUNCTION final.assign_user_bug(varchar(255), integer, varchar(255)) 
+	RETURNS INTEGER 
+AS $$ 
+DECLARE
+	local_usr_id integer;
+
+BEGIN
+	
+	SELECT usr.usr_id into local_usr_id
+	FROM final.users_bug_rel usr_bug
+		INNER JOIN final.user usr
+			ON usr_bug.usr_id = usr.usr_id
+		INNER JOIN final.bug bug
+			ON usr_bug.bug_id = bug.bug_id
+	WHERE usr.usr_name = $1 AND bug.bug_id = $2;
+
+	IF (local_usr_id is NULL) THEN
+
+		SELECT usr.usr_id into local_usr_id
+		FROM final.user usr
+		WHERE usr.usr_name = $1;
+
+		INSERT INTO final.users_bug_rel (usr_id, bug_id, role)
+		VALUES (local_usr_id, $2, $3);
+		RETURN 1;
+	END IF;
+	-- Return failed to the application
+	RETURN 0;
+END;
+$$ LANGUAGE plpgsql;
+-- select * from final.assign_user_bug('tue', 2, 'bug owner')
+
+CREATE OR REPLACE FUNCTION final.get_all_bugs_for_user(varchar(255)) 
+	RETURNS TABLE (bug_id integer, bug_title varchar(255), status varchar(255), content text) 
+AS $$ 
+BEGIN
+	RETURN QUERY
+	SELECT bug.bug_id, bug.bug_title, status.status_name, bug.content
+	FROM final.users_bug_rel usr_bug 
+		INNER JOIN final.bug bug
+			ON usr_bug.bug_id = bug.bug_id 
+		INNER JOIN final.user usr
+			ON usr_bug.usr_id = usr.usr_id
+		INNER JOIN final.status status
+			ON bug.status_id = status.status_id
+	WHERE usr.usr_name = $1;
+	
+END;
+$$ LANGUAGE plpgsql;
+-- select * from final.get_all_bugs_for_user('tue')
+
+CREATE OR REPLACE FUNCTION final.get_all_users_for_bug(integer) 
+	RETURNS TABLE (usr_name varchar(255), role varchar(255)) 
+AS $$ 
+BEGIN
+	RETURN QUERY
+	SELECT usr.usr_name, usr_bug.role
+	FROM final.users_bug_rel usr_bug 
+		INNER JOIN final.bug bug
+			ON usr_bug.bug_id = bug.bug_id 
+		INNER JOIN final.user usr
+			ON usr_bug.usr_id = usr.usr_id
+
+	WHERE bug.bug_id = $1;
+	
+END;
+$$ LANGUAGE plpgsql;
+-- select * from final.get_all_users_for_bug(2)
+
+CREATE OR REPLACE FUNCTION final.unassign_user_bug(varchar(255), integer) 
+	RETURNS INTEGER 
+AS $$ 
+DECLARE
+	local_usr_id integer;
+
+BEGIN
+	SELECT usr.usr_id into local_usr_id
+	FROM final.user usr
+	WHERE usr.usr_name = $1;
+
+	IF (local_usr_id is not null) THEN
+		DELETE
+		FROM final.users_bug_rel usr_bug
+		WHERE usr_bug.usr_id = local_usr_id AND usr_bug.bug_id = $2;
+	END IF;
+	-- Return failed to the application
+	RETURN 1;
+END;
+$$ LANGUAGE plpgsql;
+-- select * from final.unassign_user_bug('tue', 2)
