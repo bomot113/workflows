@@ -100,8 +100,19 @@ AS $$
 DECLARE
 	local_status_id integer;
 BEGIN
-	INSERT INTO final.status (status_name, description) values ($1, $2);
-	SELECT currval('final.status_status_id_seq') INTO local_status_id;
+	SELECT status.status_id INTO local_status_id
+	FROM final.status status
+	WHERE status.status_name = $1;
+
+	IF (local_status_id is null) THEN 
+		INSERT INTO final.status (status_name, description) values ($1, $2);
+		SELECT currval('final.status_status_id_seq') INTO local_status_id;
+	ELSE
+		UPDATE final.status 
+		SET description = $2
+		WHERE status_id = local_status_id;
+	END IF;
+	
 	RETURN local_status_id;
 END;
 $$ LANGUAGE plpgsql;
@@ -141,6 +152,21 @@ BEGIN
 	RETURN local_link_id;
 END;
 $$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION final.drop_link_nodes(integer, integer)
+  RETURNS integer AS
+$$ 
+BEGIN
+	-- Drop the Link between 2 nodes together
+	DELETE
+	FROM final.link link
+	WHERE link.startStatus_id = $1 AND link.endstatus_id = $2;
+
+	-- return the success status
+	RETURN 1;
+END;
+$$ LANGUAGE plpgsql;
+-- select * from final.drop_link_nodes(9,8)
 
 CREATE OR REPLACE FUNCTION final.link_wf(integer, integer, text, character)
   RETURNS integer 
@@ -598,3 +624,97 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 -- select * from final.unassign_user_bug('tue', 2)
+
+create table final.tag (
+	tag_id serial not null,
+	name varchar(255) UNIQUE,
+	primary key (tag_id)
+)
+
+create table final.tag_bug (
+	tag_id integer not null,
+	bug_id integer not null,
+	primary key (tag_id, bug_id)
+)
+
+CREATE OR REPLACE FUNCTION final.assign_tag_to_bug(varchar(255), integer) 
+	RETURNS INTEGER 
+AS $$ 
+DECLARE
+	local_tag_id integer;
+
+BEGIN
+	SELECT tag.tag_id into local_tag_id
+	FROM final.tag tag
+	WHERE tag.name = $1;
+
+	IF (local_tag_id is null) THEN
+		INSERT INTO final.tag (name) VALUES ($1);
+		SELECT	currval('final.tag_tag_id_seq') INTO local_tag_id;
+	END IF;
+
+	INSERT INTO final.tag_bug (tag_id, bug_id) VALUES
+	SELECT (local_tag_id, $2)
+	WHERE (local_tag_id, $2) NOT IN (SELECT tag_id, bug_id FROM final.tag_bug);
+
+	-- Return failed to the application
+	RETURN 1;
+END;
+$$ LANGUAGE plpgsql;
+-- select * from final.assign_tag_to_bug('funny', 2)
+
+CREATE OR REPLACE FUNCTION final.unassign_tag_bug(varchar(255), integer) 
+	RETURNS INTEGER 
+AS $$ 
+DECLARE
+	local_tag_id integer;
+
+BEGIN
+	SELECT tag.tag_id into local_tag_id
+	FROM final.tag tag
+	WHERE tag.name = $1;
+
+	IF (local_tag_id is not null) THEN
+		DELETE
+		FROM final.tag_bug tag_bug
+		WHERE tag_bug.tag_id = local_tag_id AND tag_bug.bug_id = $2;
+	END IF;
+	-- Return failed to the application
+	RETURN 1;
+END;
+$$ LANGUAGE plpgsql;
+-- select * from final.unassign_tag_bug('LOL', 2)
+
+CREATE OR REPLACE FUNCTION final.get_all_tags_for_bug(integer) 
+	RETURNS TABLE (name varchar(255)) 
+AS $$ 
+BEGIN
+	RETURN QUERY
+	SELECT tag.name
+	FROM final.tag_bug tag_bug 
+		INNER JOIN final.tag tag
+		ON tag_bug.tag_id = tag.tag_id
+	WHERE tag_bug.bug_id = $1;
+	
+END;
+$$ LANGUAGE plpgsql;
+-- select * from final.get_all_tags_for_bug(2)
+
+CREATE OR REPLACE FUNCTION final.get_all_bugs_for_tag(varchar(255)) 
+	RETURNS TABLE (bug_id integer, bug_title varchar(255), status varchar(255), content text) 
+AS $$ 
+BEGIN
+	RETURN QUERY
+	SELECT bug.bug_id, bug.bug_title, status.status_name, bug.content
+	FROM final.tag_bug tag_bug 
+		INNER JOIN final.bug bug
+			ON tag_bug.bug_id = bug.bug_id 
+		INNER JOIN final.tag tag
+			ON tag_bug.tag_id = tag.tag_id
+		INNER JOIN final.status status
+			ON bug.status_id = status.status_id
+	WHERE tag.name = $1;	
+END;
+$$ LANGUAGE plpgsql;
+-- select * from final.get_all_bugs_for_tag('LOL')
+
