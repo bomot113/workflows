@@ -1,7 +1,7 @@
 <?php
-$cCreateNode = "select * from indv.create_node";
-$cSelectNode = "select * from indv.select_node";
-$cSelectChildnodes = "select * from indv.get_childnodes";
+$cCreateNode = "select * from final.create_status";
+$cSelectNode = "select * from final.select_node";
+$cSelectChildnodes = "select * from final.get_NextStatus";
 class node {
 	private $n_id;
 	private $printing;
@@ -52,8 +52,19 @@ class node {
 		}
 	}	
 
+	public function getNextNodes($status_id){
+		global $cSelectChildnodes;
+		if ($status_id != NULL){
+			$queryStr = $cSelectChildnodes."('{$status_id}')";
+			$this->printing = "Next statuses:\n";
+			$this->printing = "Status_id | Status Name | Description  \n ";
+			runSetDbQuery($queryStr, array($this, "printNodes"));
+			return $this->printing;
+		}
+	}
+
 	public function printNodes($row){
-		$this->printing .=  $row['childnode_n_sn']." | ". $row['from_n_sn']." | ".$row['linkinfo']."\n";
+		$this->printing .= $row['status_id']." | ". $row['status_name']." | ".$row['description']."\n";
 	}
 }
 ?>

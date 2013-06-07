@@ -1,21 +1,4 @@
-create schema final;
-create table final.status (
-	status_id serial not null,
-	status_name varchar(255) not null,
-	description text,
-	primary key (status_id));
-
-create table final.workflow(
-	wf_id serial not null,
-	wf_name varchar(255),
-	description text,
-	start_status_id int not null,
-	final_status_id int not null,
-	primary key (wf_id),
-	foreign key (start_status_id) references final.status(status_id) on delete no action,
-	foreign key (final_status_id) references final.status(status_id) on delete no action
-)
-
+﻿
 CREATE OR REPLACE FUNCTION final.create_workflow(varchar(255), text) 
 	RETURNS INTEGER 
 AS $$ 
@@ -24,49 +7,40 @@ DECLARE
 	local_final_status_id integer;
 	local_wf_id integer;
 BEGIN
-	
+	-- create new workflow
+	INSERT INTO final.workflow (wf_name, description) 
+		values ($1, $2);
+	SELECT currval('final.workflow_wf_id_seq') INTO local_wf_id;
+
 	-- Create a new start status for this workflow
-	INSERT INTO final.status (status_name, description) 
-	VALUES ('Start', 'Start of the workflow ' || $1);
+	INSERT INTO final.status (wf_id, status_name, description) 
+	VALUES (local_wf_id, 'Start', 'Start of the workflow ' || $1);
 	SELECT currval('final.status_status_id_seq') INTO local_start_status_id;
 	
 	-- Create a new end status for this workflow
-	INSERT INTO final.status (status_name, description)
-	VALUES ('End', 'End of the workflow ' || $1);
+	INSERT INTO final.status (wf_id, status_name, description)
+	VALUES (local_wf_id, 'End', 'End of the workflow ' || $1);
 	SELECT currval('final.status_status_id_seq') INTO local_final_status_id;
 	
-	-- create new workflow
-	INSERT INTO final.workflow (wf_name, start_status_id, final_status_id, description) 
-		values ($1, local_start_status_id, local_final_status_id, $2);
-	SELECT currval('final.workflow_wf_id_seq') INTO local_wf_id;
+	-- update start and end statuses for the new workflow
+	UPDATE final.workflow 
+	SET 	(start_status_id, final_status_id) =  (local_start_status_id, local_final_status_id)
+	WHERE wf_id = local_wf_id;
 	
 	-- Return wf_id to the application
 	RETURN local_wf_id;
 END;
 $$ LANGUAGE plpgsql;
-
 -- select final.create_workflow('normal workflow','normal bug tracking follow for agile project')
+
 CREATE OR REPLACE FUNCTION final.delete_workflow(varchar(255)) 
 	RETURNS VOID 
 AS $$ 
-DECLARE
-	local_start_status_id integer;
-	local_final_status_id integer;
+
 BEGIN
-	
-	SELECT 	wf.start_status_id, wf.final_status_id INTO local_start_status_id, 
-			 local_final_status_id
-	FROM final.workflow wf
-	WHERE wf.wf_name = $1;
-	
 	DELETE 
 	FROM final.workflow wf 
 	WHERE wf.wf_name = $1;
-
-	DELETE 
-	FROM final.status st
-	WHERE 	(st.status_id = local_start_status_id) OR
-			(st.status_id = local_final_status_id);
 END;
 $$ LANGUAGE plpgsql;
 -- select final.delete_workflow('normal workflow')
@@ -94,22 +68,23 @@ END;
 $$ LANGUAGE plpgsql;
 -- select * from final.get_workflows()
 
-CREATE OR REPLACE FUNCTION final.create_status(varchar(255), text) 
+CREATE OR REPLACE FUNCTION final.create_status(integer, varchar(255), text) 
 	RETURNS INTEGER 
 AS $$ 
 DECLARE
 	local_status_id integer;
+
 BEGIN
 	SELECT status.status_id INTO local_status_id
 	FROM final.status status
-	WHERE status.status_name = $1;
+	WHERE status.wf_id = $1 AND status.status_name = $2;
 
 	IF (local_status_id is null) THEN 
-		INSERT INTO final.status (status_name, description) values ($1, $2);
+		INSERT INTO final.status (wf_id, status_name, description) values ($1, $2, $3);
 		SELECT currval('final.status_status_id_seq') INTO local_status_id;
 	ELSE
 		UPDATE final.status 
-		SET description = $2
+		SET description = $3
 		WHERE status_id = local_status_id;
 	END IF;
 	
@@ -118,22 +93,25 @@ END;
 $$ LANGUAGE plpgsql;
 -- select final.create_status('new','this bug has just been submitted')
 
-create table final.link (
-	link_id serial not null,
-	startStatus_id integer not null,
-	endStatus_id integer not null,
-	description text,
-	foreign key (startStatus_id) references final.status (status_id) on delete cascade,
-	foreign key (endStatus_id) references final.status (status_id) on delete cascade,
-	primary key (link_id)
-)
 
 CREATE OR REPLACE FUNCTION final.link_nodes(integer, integer, text)
   RETURNS integer AS
 $$ 
 DECLARE
 	local_link_id integer;
+	local_wf_id integer;
 BEGIN
+	-- if 2 nodes are not in the same workflow return with errors
+	SELECT status1.wf_id into local_wf_id
+	FROM final.status status1
+	INNER JOIN final.status status2
+		ON status1.wf_id = status2.wf_id
+	WHERE status1.status_id = $1 AND status2.status_id = $2;
+
+	IF (local_wf_id is NULL) THEN
+		RETURN 0;
+	END IF;
+
 	-- Link 2 nodes together
 	SELECT link_id INTO local_link_id 
 	FROM final.link
@@ -146,7 +124,7 @@ BEGIN
 	ELSE 
 		UPDATE final.link
 		SET 
-		label = $3
+		description = $3
 		WHERE link_id = local_link_id;
 	END IF;
 	RETURN local_link_id;
@@ -203,82 +181,43 @@ $$ LANGUAGE plpgsql;
 -- select final.link_wf(2, 9, 'raising a new bug', 'S')
 -- select final.link_wf(2, 9, 'not a bug, you stupid!!!', 'E')
 
-
-CREATE OR REPLACE FUNCTION final.get_child_statuses(integer) 
-	RETURNS TABLE (to_status_id integer, to_status varchar(255), to_status_desc text,
-		from_status_id integer, from_status varchar(255),  linkinfo text) 
+CREATE OR REPLACE FUNCTION final.get_NextStatus(integer) 
+	RETURNS TABLE (status_id integer, status_name varchar(255), description text) 
 AS $$ 
 BEGIN
-	RETURN QUERY
-	with recursive cte_tree(to_status_id, to_status, from_status_id, from_status, to_status_desc, linkinfo) as (
-	select 	childstatus.status_id as to_status_id, 
-		childstatus.status_name as to_status,
-		childstatus.description as to_status_desc,
-		status.status_id as from_status_id,
-		status.status_name as from_status, 
-		link.description as linkinfo
-	from final.status status
-	  inner join final.link link
-		  on status.status_id = link.startstatus_id
-	  inner join final.status childstatus
-		  on link.endstatus_id = childstatus.status_id
-	where status.status_id = $1
 	
-    UNION ALL
-	select 	childstatus.status_id as to_status_id, 
-		childstatus.status_name as to_status,
-		childstatus.description as to_status_desc,
-		cte.to_status_id as from_status_id,
-		cte.to_status as from_status,
- 		link.description as linkinfo
-	from cte_tree cte
-	inner join final.link link
-	        on cte.to_status_id = link.startstatus_id
-	inner join final.status childstatus
-		on link.endstatus_id = childstatus.status_id
-	) 
-	select 	
-		tree.to_status_id, tree.to_status, tree.to_status_desc,
-		tree.from_status_id, tree.from_status,
-		tree.linkinfo
-	from cte_tree tree
-	group by tree.to_status_id, tree.to_status, 
-		tree.from_status_id, tree.from_status,
-		tree.to_status_desc, tree.linkinfo;
+	RETURN QUERY
+	SELECT  n_status.status_id, n_status.status_name, n_status.description
+	FROM final.status status
+	INNER JOIN final.link link
+		ON status.status_id = link.startStatus_id
+	INNER JOIN final.status n_status
+		ON link.endstatus_id = n_status.status_id
+	WHERE status.status_id = $1;
 
-END;
+END
 $$ LANGUAGE plpgsql;
--- select * from final.get_child_statuses(7)
+
 
 CREATE OR REPLACE FUNCTION final.get_Status_by_workflow(varchar(255)) 
-	RETURNS TABLE (status_name varchar(255), description text) 
+	RETURNS TABLE (status_id integer, status_name varchar(255), description text) 
 AS $$ 
 DECLARE
 	local_start_status_id integer;
 	local_final_status_id integer;
 BEGIN
 	
-	SELECT 	wf.start_status_id, wf.final_status_id INTO local_start_status_id, 
-			 local_final_status_id
-	FROM final.workflow wf
-	WHERE wf.wf_name=$1;
 	RETURN QUERY
-	SELECT  cte.to_status as status_name,
-			cte.to_status_desc as description
-	FROM final.get_child_statuses(local_start_status_id) cte
-	WHERE cte.to_status_id <> local_final_status_id;
+	SELECT  status.status_id, status.status_name, status.description
+	FROM final.status status
+	INNER JOIN final.workflow wf
+		ON status.wf_id = wf.wf_id
+	WHERE wf.wf_name = $1;
+
 END
 $$ LANGUAGE plpgsql;
 -- select * from final.get_Status_by_workflow('normal workflow');
 
-create table final.project(
-	prj_id serial not null,
-	prj_name varchar(255) UNIQUE,
-	description text,
-	wf_id int not null,
-	primary key (prj_id),
-	foreign key (wf_id) references final.workflow(wf_id) on delete no action
-)
 
 CREATE OR REPLACE FUNCTION final.create_project(integer, varchar(255), text) 
 	RETURNS INTEGER 
@@ -296,12 +235,14 @@ $$ LANGUAGE plpgsql;
 -- select final.create_project(2, 'INFO445 final project','an awesome class')
 
 CREATE OR REPLACE FUNCTION final.get_projects() 
-	RETURNS TABLE (prj_name varchar(255), description text) 
+	RETURNS TABLE (prj_name varchar(255), description text, p_wf varchar(255)) 
 AS $$ 
 BEGIN
 	RETURN QUERY
-	SELECT prj.prj_name, prj.description 
-	FROM final.project prj;
+	SELECT prj.prj_name as p_name, prj.description, wf.wf_name as p_wf
+	FROM final.project prj 
+	inner join final.workflow wf
+	 on prj.wf_id = wf.wf_id;
 END;
 $$ LANGUAGE plpgsql;
 -- select * from final.get_projects()
@@ -320,11 +261,6 @@ END;
 $$ LANGUAGE plpgsql;
 -- select final.delete_project(2)
 
-create table final.user(
-	usr_id serial not null,
-	usr_name varchar(255) UNIQUE,
-	primary key (usr_id)
-)
 
 CREATE OR REPLACE FUNCTION final.create_user(varchar(255)) 
 	RETURNS INTEGER 
@@ -364,13 +300,7 @@ END;
 $$ LANGUAGE plpgsql;
 -- select * from final.get_users()
 
-create table final.Project_User_Role (
-	usr_id integer not null,
-	prj_id integer not null,
-	primary key (usr_id, prj_id),
-	foreign key (usr_id) references final.user(usr_id) on delete no action,
-	foreign key (prj_id) references final.project(prj_id) on delete no action
-)
+
 
 CREATE OR REPLACE FUNCTION final.assign_user_project(varchar(255), varchar(255)) 
 	RETURNS INTEGER 
@@ -426,17 +356,7 @@ END;
 $$ LANGUAGE plpgsql;
 -- 	SELECT * from final.get_all_user_in_project('INFO445 final project');
 
-create table final.Bug (
-	bug_id serial not null,
-	prj_id integer not null,
-	status_id integer not null,
-	bug_title varchar(255),
-	date_created timestamp not null,
-	content text,
-	primary key (bug_id),
-	foreign key (prj_id) references final.project(prj_id) on delete no action,
-	foreign key (status_id) references final.status(status_id) on delete no action
-)
+
 
 CREATE OR REPLACE FUNCTION final.create_bug(varchar(255), varchar(255), text) 
 	RETURNS INTEGER 
@@ -523,16 +443,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 -- 	SELECT * from final.get_all_bugs_in_project('INFO445 final project');
-
-create table final.users_bug_rel (
-	usr_id integer not null,
-	bug_id integer not null,
-	role varchar(255),
-	primary key (usr_id, bug_id),
-	foreign key (usr_id) references final.user(usr_id) on delete cascade,
-	foreign key (bug_id) references final.bug(bug_id) on delete cascade
-)
-
 
 CREATE OR REPLACE FUNCTION final.assign_user_bug(varchar(255), integer, varchar(255)) 
 	RETURNS INTEGER 
@@ -625,17 +535,6 @@ END;
 $$ LANGUAGE plpgsql;
 -- select * from final.unassign_user_bug('tue', 2)
 
-create table final.tag (
-	tag_id serial not null,
-	name varchar(255) UNIQUE,
-	primary key (tag_id)
-)
-
-create table final.tag_bug (
-	tag_id integer not null,
-	bug_id integer not null,
-	primary key (tag_id, bug_id)
-)
 
 CREATE OR REPLACE FUNCTION final.assign_tag_to_bug(varchar(255), integer) 
 	RETURNS INTEGER 
@@ -653,8 +552,8 @@ BEGIN
 		SELECT	currval('final.tag_tag_id_seq') INTO local_tag_id;
 	END IF;
 
-	INSERT INTO final.tag_bug (tag_id, bug_id) VALUES
-	SELECT (local_tag_id, $2)
+	INSERT INTO final.tag_bug (tag_id, bug_id)
+	SELECT local_tag_id, $2
 	WHERE (local_tag_id, $2) NOT IN (SELECT tag_id, bug_id FROM final.tag_bug);
 
 	-- Return failed to the application
@@ -718,3 +617,32 @@ END;
 $$ LANGUAGE plpgsql;
 -- select * from final.get_all_bugs_for_tag('LOL')
 
+CREATE OR REPLACE FUNCTION final.get_NextStatus_for_bug(integer) 
+	RETURNS TABLE (status_id integer, status_name varchar(255), description text) 
+AS $$ 
+BEGIN
+	
+	RETURN QUERY
+	SELECT  n_status.status_id, n_status.status_name, n_status.description
+	FROM final.bug bug
+	INNER JOIN final.link link
+		ON bug.status_id = link.startStatus_id
+	INNER JOIN final.status n_status
+		ON link.endstatus_id = n_status.status_id
+	WHERE bug.bug_id = $1;
+
+END
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION final.set_Status_for_bug(integer, integer) 
+	RETURNS INTEGER 
+AS $$
+ 
+BEGIN
+	UPDATE final.bug
+	SET status_id = $2
+	WHERE bug.bug_id = $1 AND $2 in (SELECT status_id from final.status);
+	RETURN 1;
+END
+$$ LANGUAGE plpgsql;

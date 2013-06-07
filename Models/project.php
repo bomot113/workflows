@@ -1,9 +1,9 @@
 <?php
-$cSelectProject = "select * from indv.selectProject";
-$cCreateProject = "select * from indv.createProject";
-$cDeleteProject = "select * from indv.deleteProject";
-$cListProject	= "select * from indv.getProjects()";
-
+$cSelectProject = "select * from final.select_Project";
+$cCreateProject = "select * from final.create_Project";
+$cDeleteProject = "select * from final.deleteProject";
+$cListProject	= "select * from final.get_Projects()";
+include_once 'Models/workflow.php';
 class project{
 	private $p_id;
 	private $p_name;
@@ -12,7 +12,9 @@ class project{
 
 	//Sets the project workflow
 	public function set_p_wf($p_wf){
-		$this->p_wf = $p_wf;
+		$wf = new Workflow();
+		$wf->set_wf_name($p_wf);
+		$this->p_wf = $wf->get_wf_id();
 	}
  
 	//Sets the project name, checks if project name already exists
@@ -45,7 +47,7 @@ class project{
 	public function create(){
 		global $cCreateProject; 
 		if($this->p_id == NULL){
-			$queryStr = $cCreateProject."('{$this->p_name}','{$this->p_wf}')";
+			$queryStr = $cCreateProject."('{$this->p_wf}','{$this->p_name}','')";
 			$returnedVal = runScalarDbQuery($queryStr);
 			if($returnedVal != NULL){
 				$this->p_id = $returnedVal;				
@@ -67,14 +69,14 @@ class project{
 		global $cListProject;
 		$queryStr = $cListProject;
 		$this->printing = "All projects have been created:\n";
-		$this->printing .= "Name | Workflow\n";  
+		$this->printing .= "Name | Description | Workflow\n";  
 		runSetDbQuery($queryStr, array($this, 'projectPrintLine'));
 		return $this->printing;
 	}
 	
 	//Call back function to print all the records in the dataset.
 	function projectPrintLine($row){
-		$this->printing .= $row['p_name']." | ". $row['p_wf']."\n";
+		$this->printing .= $row['prj_name']." | ". $row['description'] ." | ". $row['p_wf']."\n";
 	}
 }
 ?>

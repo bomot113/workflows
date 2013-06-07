@@ -6,8 +6,8 @@ class Developer_Controller{
 	public function __construct($d_model){
 		$this->d = $d_model;
 	}
-	public function getAlldevelopers(){
-		$gResult = $this->d->getAlldevelopers();
+	public function getAllDevelopers(){
+		$gResult = $this->d->getAllDevelopers();
 		return $gResult;
 	}
 	
@@ -23,8 +23,7 @@ class Developer_Controller{
 		return $gResult;
 	}
 
-	public function create($d_name, $d_info){
-		$this->d->set_d_info($d_info);
+	public function create($d_name){
 		$this->d->set_d_name($d_name);
 		if($this->d->get_d_id() == NULL){
 			$this->d->create();

@@ -16,9 +16,9 @@ window.onload=function() {
 </head>
 
 <body>
-<h3>Simple Command Shell <font size="-1">  [<a href="index.html">font door</a></font>] </h3>
+<h3>Bug Tracking with FLEXIBLE workflows<font size="-1">  [<a href="index.html">font door</a></font>] </h3>
 <p>
-Useful for learning, implementation &amp; debugging
+Useful for team development and communication to solve BUGs
 </p>
 
 <form action="terminal.php" method="post" name="terminal">

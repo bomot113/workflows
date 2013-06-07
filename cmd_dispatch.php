@@ -9,6 +9,11 @@ include_once 'cmd_util.php';
 include_once 'cmd_workflow.php';
 include_once 'cmd_node.php';
 include_once 'cmd_link.php';
+include_once 'cmd_developer.php';
+include_once 'cmd_bug.php';
+include_once 'cmd_tag.php';
+include_once 'cmd_project.php';
+
 /*
  * This function seeks to find a function that matches the command
  */
@@ -34,6 +39,27 @@ function dispatchCommand($cmd_list)
 	}
 		// Try to match the command against the Link commands
 	$status = dispatchLinkCmd($cmd, $cmd_list);
+	if ($status != cCmdStatus_NOT_FOUND) {
+		return $status;
+	}
+	
+		// Try to match the command against the Link commands
+	$status = dispatchDeveloperCmd($cmd, $cmd_list);
+	if ($status != cCmdStatus_NOT_FOUND) {
+		return $status;
+	}
+	
+	$status = dispatchBugCmd($cmd, $cmd_list);
+	if ($status != cCmdStatus_NOT_FOUND) {
+		return $status;
+	}
+
+	$status = dispatchTagCmd($cmd, $cmd_list);
+	if ($status != cCmdStatus_NOT_FOUND) {
+		return $status;
+	}
+	
+	$status = dispatchProjectCmd($cmd, $cmd_list);
 	if ($status != cCmdStatus_NOT_FOUND) {
 		return $status;
 	}

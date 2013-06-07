@@ -16,10 +16,10 @@ class Node_Controller {
 		} else {
 			$this->node->init($this->wf->get_wf_id(), $n_sn, $n_type);
 			if ($this->node->get_n_id() != NULL){
-				$result = "can't create ANOTHER node named $n_sn type $n_type in the workflow $wf_name exists";
+				$result = "can't create ANOTHER status named $n_sn type $n_type in the workflow $wf_name exists";
 			} else {
 				$this->node->create($this->wf->get_wf_id(),$n_sn, $n_type, $n_name);
-				$result = "a node named '$n_sn' has been created.";
+				$result = "a status named '$n_sn' has been created.";
 			}
 		}
 		return $result;
@@ -35,6 +35,11 @@ class Node_Controller {
 		}
 		return $result;
 	}
+	public function getNextNodes($status_id){
+		$result="";
+		$result = $this->node->getNextNodes($status_id);
+		return $result;
+	}
 
 	public function list_childnodes($wf_name, $n_sn){
 		$result="";
@@ -44,7 +49,7 @@ class Node_Controller {
 		} else {
 			$this->node->init($this->wf->get_wf_id(), $n_sn);
 			if ($this->node->get_n_id() == NULL){
-				$result = "couldn't locate node named $n_sn in the workflow $wf_name.";
+				$result = "couldn't locate status named $n_sn in the workflow $wf_name.";
 			} else {
 				$result = $this->node->list_childnodes();
 			}

@@ -1,11 +1,11 @@
 <?php
-$cSelectWorkflow = "select * from indv.select_workflow";
-$cCreateWorkflow = "select * from indv.create_workflow";
-$cDeleteWorkflow = "select * from indv.delete_workflow";
-$cListWorkflow	 = "select * from indv.get_workflows()";
-$cGetNodes 			 = "select * from indv.get_Nodes";
-$cLinkWF			 	 = "select * from indv.link_WF";
-$cLinkNodes			 = "select * from indv.link_nodes";
+$cSelectWorkflow = "select * from final.select_workflow";
+$cCreateWorkflow = "select * from final.create_workflow";
+$cDeleteWorkflow = "select * from final.delete_workflow";
+$cListWorkflow	 = "select * from final.get_workflows()";
+$cGetNodes 			 = "select * from final.get_Status_by_workflow";
+$cLinkWF			 	 = "select * from final.link_WF";
+$cLinkNodes			 = "select * from final.link_nodes";
 class workflow {
 	private $wf_id;
 	private $wf_name;
@@ -51,7 +51,7 @@ class workflow {
 			if ($returnedVal != NULL){
 				$this->wf_id = $returnedVal["wf_id"];
 				$this->wf_name = $returnedVal["wf_name"];
-				$this->wf_info = $returnedVal["wf_info"];
+				$this->wf_info = $returnedVal["description"];
 			}
 		}
 	}
@@ -102,8 +102,8 @@ class workflow {
 	public function getNodes(){
 		global $cGetNodes;
 		$queryStr = $cGetNodes."('{$this->wf_name}');";
-		$this->printing = "Nodes in workflow $this->wf_name:\n";
-		$this->printing .= "SName | Type | Full Name | \n";  
+		$this->printing = "Statuses in workflow $this->wf_name:\n";
+		$this->printing .= "Status_id | Status Name | Description | \n";  
 		runSetDbQuery($queryStr, array($this, 'nodePrintLine'));
 		return $this->printing;
 	}
@@ -112,7 +112,7 @@ class workflow {
 	 */
 	function nodePrintLine($row)
 	{
-		$this->printing .= $row['n_sn']." | ". $row['n_type']." | ".$row['n_name']."\n";
+		$this->printing .= $row['status_id']." | ". $row['status_name']." | ".$row['description']."\n";
 	}	
 
  /*

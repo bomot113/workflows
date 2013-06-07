@@ -1,8 +1,8 @@
 <?php
-$cSelectBug = "select * from indv.selectBug";
-$cCreateBug = "select * from indv.createBug";
-$cDeleteBug = "select * from indv.deleteBug";
-$cListBug	= "select * from indv.getBugs()";
+$cSelectBug = "select * from final.selectBug";
+$cCreateBug = "select * from final.create_Bug";
+$cDeleteBug = "select * from final.deleteBug";
+$cListBug	= "select * from final.getBugs()";
 
 class bug{
 	private $b_id;
@@ -54,7 +54,7 @@ class bug{
 	public function create(){
 		global $cCreateBug; 
 		if($this->b_id == NULL){
-			$queryStr = $cCreateBug."(".$this->b_name.", ".$this->b_project.", ".$this->b_creator.", ".$this->b_responsible.")";
+			$queryStr = $cCreateBug."(".$this->b_project.", ".$this->b_name.")";
 			$returnedVal = runScalarDbQuery($queryStr);
 			if($returnedVal != NULL){
 				$this->b_id = $returnedVal;				

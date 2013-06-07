@@ -12,7 +12,7 @@ function dispatchNodeCmd($cmd, $cmd_list)
 	$status = cCmdStatus_NOT_FOUND;
 	
 	$cmd = $cmd_list[0];
-	if ($cmd != "node") {
+	if ($cmd != "status") {
 		$status = cCmdStatus_NOT_FOUND; 
 		return $status;
 	}
@@ -30,6 +30,9 @@ function dispatchNodeCmd($cmd, $cmd_list)
 	}
 	elseif ($arg1 == "list") {
 		$status = node_list($cmd_list);
+	}
+	elseif ($arg1 == "next") {
+		$status = node_next($cmd_list);
 	}
 	else {
 		$status = cCmdStatus_NOT_FOUND; 
@@ -88,4 +91,18 @@ function node_list($cmd_list){
 	return cCmdStatus_OK;
 }
 
+/*
+ * List all adjacent statuses of status in a given workflow
+ */
+function node_next($cmd_list){
+	global $gResult;
+	$status_id= search_cmdOpt($cmd_list, 'id');
+	if($status_id == "") {
+		$msg = "what workflow status are you talking about?";
+	}
+  	$n_controller = new Node_Controller(new Node, new Workflow);
+	$msg=$n_controller->getNextNodes($status_id);
+	$gResult = $gResult.$msg;
+	return cCmdStatus_OK;
+}
 ?>

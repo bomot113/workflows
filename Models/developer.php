@@ -1,8 +1,8 @@
 <?php
-$cSelectDeveloper = "select * from indv.selectDeveloper";
-$cCreateDeveloper = "select * from indv.createDeveloper";
-$cDeleteDeveloper = "select * from indv.deleteDeveloper";
-$cListDeveloper	  = "select * from indv.getDevelopers()";
+$cSelectDeveloper = "select * from final.selectDeveloper";
+$cCreateDeveloper = "select * from final.create_user";
+$cDeleteDeveloper = "select * from final.deleteDeveloper";
+$cListDeveloper	  = "select * from final.get_users()";
 
 class developer{
 	private $d_id;
@@ -38,7 +38,7 @@ class developer{
 	public function create(){
 		global $cCreateDeveloper; 
 		if($this->d_id == NULL){
-			$queryStr = $cCreateDeveloper."('{$this->d_name}')";
+			$queryStr = $cCreateDeveloper."('{$this->d_name}')";			
 			$returnedVal = runScalarDbQuery($queryStr);
 			if($returnedVal != NULL){
 				$this->d_id = $returnedVal;				
@@ -67,7 +67,7 @@ class developer{
 	
 	//Call back function to print all the records in the dataset.
 	function developerPrintLine($row){
-		$this->printing .= $row['d_name']."\n";
+		$this->printing .= $row['usr_name']."\n";
 	}	
 }
 ?>

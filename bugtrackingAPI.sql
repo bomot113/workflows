@@ -69,7 +69,7 @@
 	Select * from final.assign_tag_to_bug('funny', 2)
 		-- $1: tag
 		-- $2: bug id
-	Select * from unassign_tag_bug ('funny', 2)
+	Select * from final.unassign_tag_bug ('funny', 2)
 		-- $1: tag
 		-- $2: bug id
 	Select * from final.get_all_tags_for_bug(2)	
